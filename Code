@@ -1,0 +1,291 @@
+// ████████████████████████████████████████████████████████████
+// CODE.GS — ResidApp Backend
+// ████████████████████████████████████████████████████████████
+
+// ████████████████████████████████████████████████████████████
+// CODE.GS — ResidApp Backend
+// ████████████████████████████████████████████████████████████
+
+// ─── CONFIGURACIÓN GLOBAL ────────────────────────────────────
+const CONFIG = {
+  SHEET_REGISTROS : 'Registros',
+  SHEET_USUARIOS  : 'Usuarios',
+  FOLDER_ID       : 'TU_FOLDER_ID_DE_DRIVE_AQUI',   // <-- reemplaza
+  SPREADSHEET_ID  : SpreadsheetApp.getActiveSpreadsheet().getId(),
+  CACHE_KEY       : 'dashboard_data',
+  CACHE_EXPIRY    : 300, // segundos
+  REGISTROS_HEADERS: [
+    'Timestamp','Torre','Apartamento','Propietario Nombre',
+    'Propietario Documento','Propietario Teléfono','Propietario Email',
+    'Tipo Ocupación','Agencia Nombre','Agencia Contacto',
+    'Agencia Teléfono','Agencia Email','Residente Nombre',
+    'Residente Documento','Residente Teléfono','Residente Email',
+    'Tiene Mascotas','Mascotas (JSON)','Fotos (URLs)'
+  ]
+};
+
+// ─── doGet ───────────────────────────────────────────────────
+function doGet(e) {
+  return HtmlService
+    .createHtmlOutputFromFile('Index')
+    .setTitle('ResidApp')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ─── verifyLogin ─────────────────────────────────────────────
+function verifyLogin(email, password) {
+  try {
+    if (!email || !password) return { success: false, message: 'Campos vacíos.' };
+    const ss    = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEET_USUARIOS);
+    if (!sheet) return { success: false, message: 'Hoja Usuarios no encontrada.' };
+    const data  = sheet.getDataRange().getValues();
+    // Columnas esperadas: A=Email, B=Password, C=Nombre, D=Activo
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (String(row[0]).trim().toLowerCase() === email.trim().toLowerCase()
+          && String(row[1]).trim() === password.trim()
+          && String(row[3]).trim().toLowerCase() === 'true') {
+        return { success: true, user: { email: row[0], name: row[2] || 'Administrador' } };
+      }
+    }
+    return { success: false, message: 'Credenciales incorrectas.' };
+  } catch(err) {
+    return { success: false, message: err.message };
+  }
+}
+
+// ─── getDashboardData ─────────────────────────────────────────
+function getDashboardData() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(CONFIG.CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+
+    const ss    = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEET_REGISTROS);
+    if (!sheet || sheet.getLastRow() < 2) {
+      return { kpis: { totalApts: 0, totalPets: 0, recent30: 0 }, records: [] };
+    }
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 19).getValues();
+    const now  = new Date();
+    const ms30 = 30 * 24 * 60 * 60 * 1000;
+
+    let totalPets = 0, recent30 = 0;
+    const records = [];
+
+    rows.forEach(function(r) {
+      const ts      = new Date(r[0]);
+      const masJson = r[17] ? JSON.parse(r[17]) : [];
+      totalPets    += masJson.length;
+      if ((now - ts) < ms30) recent30++;
+      records.push({
+        timestamp   : Utilities.formatDate(ts, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+        torre       : r[1],
+        apartamento : r[2],
+        propietario : r[3],
+        ocupacion   : r[7],
+        mascotas    : masJson.length
+      });
+    });
+
+    records.reverse(); // más recientes primero
+
+    const result = {
+      kpis: { totalApts: rows.length, totalPets, recent30 },
+      records: records.slice(0, 10)
+    };
+    cache.put(CONFIG.CACHE_KEY, JSON.stringify(result), CONFIG.CACHE_EXPIRY);
+    return result;
+  } catch(err) {
+    return { error: true, message: err.message };
+  }
+}
+
+// ─── processRegistration ──────────────────────────────────────
+function processRegistration(data) {
+  try {
+    const ss    = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ensureRegistrosSheet(ss);
+
+    // Prevención de duplicados
+    if (sheet.getLastRow() > 1) {
+      const existing = sheet.getRange(2, 2, sheet.getLastRow() - 1, 2).getValues();
+      for (let i = 0; i < existing.length; i++) {
+        if (String(existing[i][0]) === String(data.torre)
+            && String(existing[i][1]) === String(data.apartamento)) {
+          return { success: false, message: `La Torre ${data.torre}, Apto ${data.apartamento} ya existe.` };
+        }
+      }
+    }
+
+    // Procesar fotos
+    const fotoUrls = [];
+    const petsSanitized = (data.mascotas || []).map(function(pet) {
+      if (pet.base64) {
+        const url = saveImageToDrive(
+          pet.base64, pet.mime,
+          `Mascota_T${data.torre}-${data.apartamento}_${pet.nombre || 'Sin_Nombre'}`
+        );
+        fotoUrls.push(`${pet.nombre}: ${url}`);
+        return Object.assign({}, pet, { fotoUrl: url, base64: null });
+      }
+      return pet;
+    });
+
+    // Construir fila
+    const ag = data.agencia   || {};
+    const re = data.residente || {};
+    const row = [
+      new Date(data.timestamp),
+      data.torre,
+      data.apartamento,
+      data.propietario.nombre,
+      data.propietario.documento,
+      data.propietario.telefono,
+      data.propietario.email,
+      data.ocupacion,
+      ag.nombre   || '',
+      ag.contacto || '',
+      ag.telefono || '',
+      ag.email    || '',
+      re.nombre    || '',
+      re.documento || '',
+      re.telefono  || '',
+      re.email     || '',
+      data.tieneMascotas ? 'Sí' : 'No',
+      JSON.stringify(petsSanitized),
+      fotoUrls.join(' | ')
+    ];
+
+    appendRow(sheet, row);
+
+    // Invalidar caché
+    CacheService.getScriptCache().remove(CONFIG.CACHE_KEY);
+
+    // Enviar correo
+    sendConfirmationEmail(data, petsSanitized, fotoUrls);
+
+    return { success: true };
+  } catch(err) {
+    return { success: false, message: err.message };
+  }
+}
+
+// ─── ensureRegistrosSheet ──────────────────────────────────────
+function ensureRegistrosSheet(ss) {
+  let sheet = ss.getSheetByName(CONFIG.SHEET_REGISTROS);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_REGISTROS);
+  }
+  if (sheet.getLastRow() === 0) {
+    const hRange = sheet.getRange(1, 1, 1, CONFIG.REGISTROS_HEADERS.length);
+    hRange.setValues([CONFIG.REGISTROS_HEADERS]);
+    hRange.setBackground('#e2e8f0');
+    hRange.setFontWeight('bold');
+    hRange.setFontSize(10);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// ─── appendRow ────────────────────────────────────────────────
+function appendRow(sheet, row) {
+  sheet.appendRow(row);
+  // Auto-resize columns
+  sheet.autoResizeColumns(1, row.length);
+}
+
+// ─── saveImageToDrive ─────────────────────────────────────────
+function saveImageToDrive(base64DataUrl, mimeType, fileName) {
+  const base64 = base64DataUrl.split(',')[1];
+  const bytes  = Utilities.base64Decode(base64);
+  const blob   = Utilities.newBlob(bytes, mimeType, fileName);
+  const folder = DriveApp.getFolderById(CONFIG.FOLDER_ID);
+  const file   = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return `https://drive.google.com/file/d/${file.getId()}/view`;
+}
+
+// ─── sendConfirmationEmail ─────────────────────────────────────
+function sendConfirmationEmail(data, pets, fotoUrls) {
+  if (!data.propietario || !data.propietario.email) return;
+
+  const petsHtml = pets.length > 0
+    ? pets.map(function(p) {
+        return `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${p.nombre||'—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${p.tipo||'—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${p.raza||'—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${p.fotoUrl ? '<a href="'+p.fotoUrl+'" style="color:#10b981;">Ver foto</a>' : '—'}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="4" style="padding:12px;color:#94a3b8;text-align:center;">Sin mascotas registradas</td></tr>';
+
+  const agHtml = data.agencia
+    ? `<p style="margin:0 0 6px;"><b>Agencia:</b> ${data.agencia.nombre} — ${data.agencia.contacto}</p>`
+    : '';
+  const resHtml = data.residente
+    ? `<p style="margin:0 0 6px;"><b>Residente:</b> ${data.residente.nombre} — ${data.residente.telefono}</p>`
+    : '';
+
+  const html = `
+  <!DOCTYPE html>
+  <html lang="es">
+  <body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,Arial,sans-serif;">
+    <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1);">
+      <div style="background:linear-gradient(135deg,#064e3b,#065f46);padding:32px 28px;text-align:center;">
+        <h1 style="margin:0;color:#fff;font-size:24px;font-weight:800;">ResidApp</h1>
+        <p style="margin:6px 0 0;color:#6ee7b7;font-size:14px;">Confirmación de Registro Residencial</p>
+      </div>
+      <div style="padding:28px;">
+        <p style="margin:0 0 16px;color:#374151;">Estimado/a <strong>${data.propietario.nombre}</strong>,</p>
+        <p style="margin:0 0 24px;color:#6b7280;font-size:14px;">Tu registro en el conjunto residencial ha sido completado exitosamente.</p>
+
+        <div style="background:#f8fafc;border-radius:14px;padding:20px;margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">📍 Inmueble</h3>
+          <p style="margin:0 0 6px;"><b>Torre:</b> ${data.torre} &nbsp;|&nbsp; <b>Apartamento:</b> ${data.apartamento}</p>
+          <p style="margin:0 0 6px;"><b>Tipo de Ocupación:</b> ${data.ocupacion}</p>
+          ${agHtml}${resHtml}
+        </div>
+
+        <div style="background:#f8fafc;border-radius:14px;padding:20px;margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">👤 Propietario</h3>
+          <p style="margin:0 0 6px;"><b>Nombre:</b> ${data.propietario.nombre}</p>
+          <p style="margin:0 0 6px;"><b>Documento:</b> ${data.propietario.documento}</p>
+          <p style="margin:0 0 6px;"><b>Teléfono:</b> ${data.propietario.telefono}</p>
+          <p style="margin:0;"><b>Email:</b> ${data.propietario.email}</p>
+        </div>
+
+        ${pets.length > 0 ? `
+        <div style="background:#f8fafc;border-radius:14px;padding:20px;margin-bottom:20px;overflow:hidden;">
+          <h3 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">🐾 Mascotas Registradas</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#e2e8f0;">
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;">Nombre</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;">Tipo</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;">Raza</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;">Foto</th>
+              </tr>
+            </thead>
+            <tbody>${petsHtml}</tbody>
+          </table>
+        </div>
+        ` : ''}
+
+        <div style="text-align:center;margin-top:24px;">
+          <p style="font-size:12px;color:#94a3b8;margin:0;">© 2025 ResidApp · Sistema de Gestión Residencial</p>
+        </div>
+      </div>
+    </div>
+  </body>
+  </html>`;
+
+  GmailApp.sendEmail(
+    data.propietario.email,
+    `✅ ResidApp — Confirmación de Registro | Torre ${data.torre}, Apto ${data.apartamento}`,
+    `Registro exitoso para Torre ${data.torre}, Apto ${data.apartamento}. Propietario: ${data.propietario.nombre}.`,
+    { htmlBody: html, name: 'ResidApp — Sistema Residencial' }
+  );
+}
