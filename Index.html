@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ResidApp — Gestión Residencial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root {
+      --emerald: #10b981;
+      --lime: #84cc16;
+      --dark: #111827;
+      --sidebar-w: 260px;
+    }
+    * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+    body { background: #f1f5f9; min-height: 100vh; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    /* ── Transitions ── */
+    .view { display: none; }
+    .view.active { display: flex; }
+    .fade-in { animation: fadeIn .35s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .slide-up { animation: slideUp .4s cubic-bezier(.16,1,.3,1); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Login ── */
+    #login-view {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #064e3b 0%, #065f46 40%, #0f172a 100%);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .login-card {
+      background: rgba(255,255,255,.97);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 32px 64px rgba(0,0,0,.35);
+    }
+    .logo-badge {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #10b981, #84cc16);
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 8px 24px rgba(16,185,129,.4);
+    }
+    .input-field {
+      width: 100%;
+      padding: .7rem 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: .9rem;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+      background: #f8fafc;
+    }
+    .input-field:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.15); background: #fff; }
+    .input-field.error { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
+    .btn-primary {
+      width: 100%;
+      padding: .85rem;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: .95rem;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s, opacity .15s;
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(16,185,129,.35); }
+    .btn-primary:active:not(:disabled) { transform: translateY(0); }
+    .btn-primary:disabled { opacity: .7; cursor: not-allowed; }
+
+    /* ── Sidebar ── */
+    #dashboard-view { flex-direction: row; min-height: 100vh; }
+    .sidebar {
+      width: var(--sidebar-w);
+      background: linear-gradient(180deg, #064e3b 0%, #0f172a 100%);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 50;
+      transition: transform .3s cubic-bezier(.16,1,.3,1);
+    }
+    .sidebar.hidden-mobile { transform: translateX(-100%); }
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40;
+    }
+    .sidebar-overlay.visible { display: block; }
+    .main-content { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+    .nav-item {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .7rem 1.25rem; border-radius: 12px; margin: .2rem .75rem;
+      color: rgba(255,255,255,.65); cursor: pointer;
+      font-size: .875rem; font-weight: 500;
+      transition: background .2s, color .2s;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.1); color: #fff; }
+    .nav-item.active { background: linear-gradient(135deg,rgba(16,185,129,.35),rgba(132,204,22,.2)); color: #34d399; }
+    .nav-item svg { flex-shrink: 0; }
+
+    /* ── KPI Cards ── */
+    .kpi-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+      display: flex; align-items: center; gap: 1rem;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+    .kpi-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    /* ── Table ── */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      background: #f8fafc; color: #64748b; font-size: .75rem;
+      font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+      padding: .75rem 1rem; text-align: left; border-bottom: 1px solid #e2e8f0;
+    }
+    .data-table td {
+      padding: .875rem 1rem; border-bottom: 1px solid #f1f5f9;
+      color: #374151; font-size: .875rem;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #f8fafc; }
+    .badge {
+      display: inline-block; padding: .2rem .65rem; border-radius: 999px;
+      font-size: .72rem; font-weight: 600; letter-spacing: .03em;
+    }
+
+    /* ── Form ── */
+    .form-section {
+      background: #fff; border-radius: 20px;
+      padding: 1.75rem; margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .form-label {
+      display: block; font-size: .8rem; font-weight: 600;
+      color: #374151; margin-bottom: .35rem; letter-spacing: .02em;
+    }
+    .form-input {
+      width: 100%; padding: .65rem 1rem;
+      border: 2px solid #e2e8f0; border-radius: 10px;
+      font-size: .875rem; transition: border-color .2s, box-shadow .2s;
+      outline: none; color: #111827; background: #f8fafc;
+    }
+    .form-input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.12); background: #fff; }
+    .form-input.error { border-color: #ef4444; }
+    .form-select {
+      width: 100%; padding: .65rem 1rem;
+      border: 2px solid #e2e8f0; border-radius: 10px;
+      font-size: .875rem; outline: none; background: #f8fafc;
+      transition: border-color .2s, box-shadow .2s; cursor: pointer;
+    }
+    .form-select:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.12); background: #fff; }
+    .err-msg { color: #ef4444; font-size: .75rem; margin-top: .25rem; display: none; }
+    .err-msg.show { display: block; }
+
+    /* ── Toggle Switch ── */
+    .toggle-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      width: 48px; height: 26px; background: #cbd5e1;
+      border-radius: 999px; transition: background .25s;
+      display: flex; align-items: center; padding: 3px;
+    }
+    .toggle-thumb {
+      width: 20px; height: 20px; background: #fff;
+      border-radius: 999px; transition: transform .25s;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    .toggle-switch input:checked + .toggle-track { background: #10b981; }
+    .toggle-switch input:checked + .toggle-track .toggle-thumb { transform: translateX(22px); }
+
+    /* ── Drag & Drop ── */
+    .drop-zone {
+      border: 2px dashed #cbd5e1; border-radius: 14px;
+      padding: 1.5rem; text-align: center;
+      cursor: pointer; transition: all .2s; background: #f8fafc;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #10b981; background: rgba(16,185,129,.05);
+    }
+    .drop-zone .preview-img {
+      width: 100%; max-height: 140px; object-fit: cover;
+      border-radius: 10px; margin-top: .5rem;
+    }
+
+    /* ── Pet Card ── */
+    .pet-card {
+      background: #f8fafc; border: 2px solid #e2e8f0;
+      border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem;
+      transition: border-color .2s;
+    }
+    .pet-card:hover { border-color: #10b981; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 999px;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999;
+      display: flex; flex-direction: column; gap: .5rem;
+    }
+    .toast {
+      padding: .85rem 1.25rem; border-radius: 14px;
+      font-size: .875rem; font-weight: 500;
+      display: flex; align-items: center; gap: .6rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
+      animation: toastIn .3s cubic-bezier(.16,1,.3,1);
+      max-width: 340px;
+    }
+    @keyframes toastIn { from { opacity:0; transform: translateX(40px); } to { opacity:1; transform: translateX(0); } }
+    .toast.success { background: #064e3b; color: #6ee7b7; }
+    .toast.error   { background: #7f1d1d; color: #fca5a5; }
+    .toast.info    { background: #1e3a5f; color: #93c5fd; }
+
+    /* ── Collapsible ── */
+    .collapsible { overflow: hidden; transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s; }
+    .collapsible.closed { max-height: 0 !important; opacity: 0; }
+    .collapsible.open { opacity: 1; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+    }
+    @media (max-width: 640px) {
+      .login-card { padding: 2rem 1.25rem; }
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: #fff; border-bottom: 1px solid #e2e8f0;
+      padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+      position: sticky; top: 0; z-index: 30;
+    }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 999px;
+      background: linear-gradient(135deg,#10b981,#84cc16);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: .85rem;
+    }
+
+    /* ── Section separator ── */
+    .section-title {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: rgba(255,255,255,.35);
+      padding: .75rem 1.5rem .25rem;
+    }
+
+    /* ── Progress steps ── */
+    .step-indicator {
+      display: flex; align-items: center; gap: 0; margin-bottom: 1.5rem;
+    }
+    .step {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 999px;
+      font-size: .8rem; font-weight: 700;
+      border: 2px solid #e2e8f0; color: #94a3b8;
+      transition: all .3s; flex-shrink: 0;
+    }
+    .step.done { background: #10b981; border-color: #10b981; color: #fff; }
+    .step.active { border-color: #10b981; color: #10b981; }
+    .step-line { flex: 1; height: 2px; background: #e2e8f0; transition: background .3s; }
+    .step-line.done { background: #10b981; }
+
+    /* ── Occupation conditional ── */
+    #agency-section, #resident-section { transition: all .3s; }
+
+    /* Add pet button */
+    .btn-add-pet {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .6rem 1.25rem; border-radius: 10px;
+      background: rgba(16,185,129,.1); color: #059669;
+      border: 2px dashed #10b981; font-weight: 600; font-size: .875rem;
+      cursor: pointer; transition: all .2s; width: 100%; justify-content: center;
+    }
+    .btn-add-pet:hover { background: rgba(16,185,129,.18); }
+
+    /* Remove pet button */
+    .btn-remove-pet {
+      display: flex; align-items: center; gap: .35rem;
+      padding: .35rem .75rem; border-radius: 8px;
+      background: rgba(239,68,68,.1); color: #ef4444;
+      border: none; font-weight: 600; font-size: .75rem;
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-remove-pet:hover { background: rgba(239,68,68,.18); }
+
+    /* Submit btn */
+    .btn-submit {
+      padding: .85rem 2.5rem;
+      background: linear-gradient(135deg,#10b981,#059669);
+      color: #fff; border: none; border-radius: 12px;
+      font-weight: 700; font-size: .95rem; cursor: pointer;
+      transition: all .2s; display: flex; align-items: center; gap: .5rem;
+    }
+    .btn-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(16,185,129,.35); }
+    .btn-submit:disabled { opacity: .65; cursor: not-allowed; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 2.5rem 1rem; color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TOAST CONTAINER
+═══════════════════════════════════════════════════════════ -->
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 1 — LOGIN
+═══════════════════════════════════════════════════════════ -->
+<div id="login-view" class="view active">
+  <div class="login-card slide-up">
+    <!-- Logo -->
+    <div class="logo-badge">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </div>
+    <h1 class="text-center text-2xl font-extrabold text-gray-900 mb-1">ResidApp</h1>
+    <p class="text-center text-sm text-gray-500 mb-6">Gestión y Registro de Residentes</p>
+
+    <form id="login-form" novalidate>
+      <!-- Email -->
+      <div class="mb-4">
+        <label class="form-label text-gray-700" for="login-email">Correo electrónico</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          </span>
+          <input type="email" id="login-email" class="input-field pl-9" placeholder="admin@residapp.co" autocomplete="email"/>
+        </div>
+        <p class="err-msg" id="err-email">Ingresa un correo válido.</p>
+      </div>
+
+      <!-- Password -->
+      <div class="mb-6">
+        <label class="form-label text-gray-700" for="login-password">Contraseña</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <input type="password" id="login-password" class="input-field pl-9 pr-10" placeholder="••••••••" autocomplete="current-password"/>
+          <button type="button" id="toggle-pw" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p class="err-msg" id="err-password">La contraseña no puede estar vacía.</p>
+      </div>
+
+      <button type="submit" id="login-btn" class="btn-primary">
+        <span id="login-btn-text">Iniciar Sesión</span>
+      </button>
+
+      <p id="login-error-msg" class="text-center text-red-500 text-sm mt-3 hidden">Credenciales incorrectas. Intenta nuevamente.</p>
+    </form>
+
+    <p class="text-center text-xs text-gray-400 mt-6">© 2025 ResidApp · Todos los derechos reservados</p>
+  </div>
+
+  <!-- Panel de Acceso Rápido -->
+  <div class="w-full max-width-xl mt-5" style="max-width:420px;">
+    <div class="rounded-2xl overflow-hidden" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(12px);">
+      <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(255,255,255,.1);">
+        <div class="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">Credenciales de Demo</span>
+        </div>
+        <button id="toggle-creds-btn" onclick="toggleCredentials()" class="text-xs text-emerald-300 hover:text-white transition-colors font-medium">Mostrar</button>
+      </div>
+      <div id="credentials-panel" class="hidden">
+        <div id="creds-list" class="divide-y" style="divide-color:rgba(255,255,255,.06);">
+          <!-- filled by JS -->
+        </div>
+        <p class="text-center text-xs px-4 py-2" style="color:rgba(255,255,255,.3);">Haz clic en una cuenta para autocompletar</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 2+3 — DASHBOARD (Sidebar + Main)
+═══════════════════════════════════════════════════════════ -->
+<div id="dashboard-view" class="view">
+
+  <!-- Sidebar Overlay (mobile) -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <!-- Brand -->
+    <div class="flex items-center gap-3 px-5 py-5 border-b border-white/10">
+      <div class="logo-badge" style="width:40px;height:40px;border-radius:12px;margin:0;box-shadow:none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <div>
+        <p class="text-white font-bold text-base leading-tight">ResidApp</p>
+        <p class="text-emerald-400 text-xs">Panel Administrativo</p>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <div class="flex-1 py-4 overflow-y-auto">
+      <p class="section-title">Principal</p>
+      <div class="nav-item active" id="nav-home" onclick="showPanel('home')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" id="nav-form" onclick="showPanel('form')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Nuevo Registro
+      </div>
+      <p class="section-title mt-3">Sistema</p>
+      <div class="nav-item" onclick="logout()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Cerrar Sesión
+      </div>
+    </div>
+
+    <!-- User info -->
+    <div class="px-4 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="avatar" id="sidebar-avatar">A</div>
+        <div class="overflow-hidden">
+          <p class="text-white text-sm font-semibold truncate" id="sidebar-user-name">Administrador</p>
+          <p class="text-emerald-400 text-xs truncate" id="sidebar-user-email">—</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <button class="md:hidden p-1 rounded-lg hover:bg-gray-100" onclick="toggleSidebar(true)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="flex-1">
+        <h2 id="topbar-title" class="font-semibold text-gray-800 text-base">Dashboard</h2>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="badge bg-gray-100 text-gray-600 hidden sm:inline-block" id="topbar-role-badge"></span>
+        <span class="hidden sm:block text-sm text-gray-500" id="topbar-date"></span>
+        <div class="avatar" id="topbar-avatar">A</div>
+      </div>
+    </div>
+
+    <!-- ── PANEL: HOME (Dashboard) ── -->
+    <div id="panel-home" class="flex-1 p-4 md:p-6 fade-in">
+      <!-- KPIs Row 1 -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <!-- Total Apts -->
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:rgba(16,185,129,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Apartamentos</p>
+            <p class="text-2xl font-extrabold text-gray-900" id="kpi-apts">—</p>
+            <p class="text-xs text-gray-400 mt-0.5" id="kpi-apts-sub">en 5 torres</p>
+          </div>
+        </div>
+        <!-- Total Pets -->
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:rgba(236,72,153,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Mascotas</p>
+            <p class="text-2xl font-extrabold text-gray-900" id="kpi-pets">—</p>
+            <p class="text-xs text-gray-400 mt-0.5" id="kpi-pets-sub">registradas</p>
+          </div>
+        </div>
+        <!-- Recientes -->
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:rgba(99,102,241,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Últimos 30 días</p>
+            <p class="text-2xl font-extrabold text-gray-900" id="kpi-recent">—</p>
+            <p class="text-xs text-gray-400 mt-0.5">registros nuevos</p>
+          </div>
+        </div>
+        <!-- Con Mascotas -->
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:rgba(245,158,11,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Con Mascotas</p>
+            <p class="text-2xl font-extrabold text-gray-900" id="kpi-with-pets">—</p>
+            <p class="text-xs text-gray-400 mt-0.5" id="kpi-with-pets-pct">apartamentos</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs Row 2: Ocupación + Torres -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Distribución Ocupación -->
+        <div class="bg-white rounded-2xl shadow-sm p-5">
+          <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Distribución por Ocupación</h4>
+          <div class="space-y-3" id="ocupacion-bars">
+            <!-- filled by JS -->
+          </div>
+        </div>
+        <!-- Distribución Torres -->
+        <div class="bg-white rounded-2xl shadow-sm p-5">
+          <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Registros por Torre</h4>
+          <div class="grid grid-cols-5 gap-2 items-end" id="torres-bars" style="height:80px;">
+            <!-- filled by JS -->
+          </div>
+          <div class="grid grid-cols-5 gap-2 mt-1">
+            <div class="text-center text-xs text-gray-400">T1</div>
+            <div class="text-center text-xs text-gray-400">T2</div>
+            <div class="text-center text-xs text-gray-400">T3</div>
+            <div class="text-center text-xs text-gray-400">T4</div>
+            <div class="text-center text-xs text-gray-400">T5</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Records Table -->
+      <div class="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 class="font-semibold text-gray-800 text-sm">Registros Recientes</h3>
+          <button onclick="loadDashboard()" class="text-emerald-600 hover:text-emerald-700 text-xs font-semibold flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Actualizar
+          </button>
+        </div>
+        <div id="table-loading" class="flex items-center justify-center py-10 text-gray-400 gap-2">
+          <div class="spinner" style="border-color:rgba(16,185,129,.2);border-top-color:#10b981;"></div>
+          Cargando datos…
+        </div>
+        <div id="table-wrapper" class="overflow-x-auto hidden">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Torre / Apto</th>
+                <th>Propietario</th>
+                <th>Tipo Ocupación</th>
+                <th>Mascotas</th>
+                <th>Fecha Registro</th>
+              </tr>
+            </thead>
+            <tbody id="records-tbody"></tbody>
+          </table>
+        </div>
+        <div id="table-empty" class="empty-state hidden">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" class="mx-auto mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p class="text-sm">Sin registros aún. ¡Crea el primero!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PANEL: FORM (Nuevo Registro) ── -->
+    <div id="panel-form" class="flex-1 p-4 md:p-6 fade-in hidden">
+
+      <!-- Step indicator -->
+      <div class="step-indicator mb-4">
+        <div class="step active" id="step1">1</div>
+        <div class="step-line" id="line1"></div>
+        <div class="step" id="step2">2</div>
+        <div class="step-line" id="line2"></div>
+        <div class="step" id="step3">3</div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-400 mb-5 -mt-1 px-0">
+        <span>Inmueble</span><span class="text-center">Ocupación</span><span class="text-right">Mascotas</span>
+      </div>
+
+      <form id="registration-form" novalidate>
+
+        <!-- ── SECTION 1: Inmueble & Propietario ── -->
+        <div class="form-section" id="section-inmueble">
+          <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span class="kpi-icon" style="width:32px;height:32px;border-radius:9px;background:rgba(16,185,129,.12);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            </span>
+            Datos del Inmueble
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="form-label" for="torre">Torre *</label>
+              <select id="torre" class="form-select" required>
+                <option value="">Seleccionar torre…</option>
+                <option value="1">Torre 1</option>
+                <option value="2">Torre 2</option>
+                <option value="3">Torre 3</option>
+                <option value="4">Torre 4</option>
+                <option value="5">Torre 5</option>
+              </select>
+              <p class="err-msg" id="err-torre">Selecciona una torre.</p>
+            </div>
+            <div>
+              <label class="form-label" for="apartamento">Apartamento * <span class="text-gray-400 font-normal">(ej: 101 – 1408)</span></label>
+              <input type="text" id="apartamento" class="form-input" placeholder="101" maxlength="4" required/>
+              <p class="err-msg" id="err-apto">Formato: piso (1-14) + unidad (01-08). Ej: 101, 1408</p>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <hr class="my-4 border-gray-100"/>
+          <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span class="kpi-icon" style="width:32px;height:32px;border-radius:9px;background:rgba(99,102,241,.12);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            Datos del Propietario
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="form-label" for="owner-name">Nombre Completo *</label>
+              <input type="text" id="owner-name" class="form-input" placeholder="María García López" required/>
+              <p class="err-msg" id="err-owner-name">Ingresa el nombre completo.</p>
+            </div>
+            <div>
+              <label class="form-label" for="owner-doc">Número de Documento *</label>
+              <input type="text" id="owner-doc" class="form-input" placeholder="1020345678" maxlength="12" required/>
+              <p class="err-msg" id="err-owner-doc">Solo números, mínimo 6 dígitos.</p>
+            </div>
+            <div>
+              <label class="form-label" for="owner-phone">Teléfono * <span class="text-gray-400 font-normal">(10 dígitos)</span></label>
+              <input type="text" id="owner-phone" class="form-input" placeholder="3101234567" maxlength="10" required/>
+              <p class="err-msg" id="err-owner-phone">Ingresa un teléfono de 10 dígitos.</p>
+            </div>
+            <div>
+              <label class="form-label" for="owner-email">Correo Electrónico *</label>
+              <input type="email" id="owner-email" class="form-input" placeholder="propietario@email.com" required/>
+              <p class="err-msg" id="err-owner-email">Ingresa un correo válido.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECTION 2: Ocupación ── -->
+        <div class="form-section" id="section-ocupacion">
+          <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span class="kpi-icon" style="width:32px;height:32px;border-radius:9px;background:rgba(245,158,11,.12);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            </span>
+            Tipo de Ocupación
+          </h3>
+          <div class="mb-4">
+            <label class="form-label" for="ocupacion">Estado del inmueble *</label>
+            <select id="ocupacion" class="form-select" onchange="handleOcupacion()" required>
+              <option value="">Seleccionar…</option>
+              <option value="Propietario">Propietario (vive en el inmueble)</option>
+              <option value="Arrendado">Arrendado</option>
+              <option value="Inmobiliaria">Administrado por Inmobiliaria</option>
+            </select>
+            <p class="err-msg" id="err-ocupacion">Selecciona el tipo de ocupación.</p>
+          </div>
+
+          <!-- Agency Section -->
+          <div id="agency-section" class="collapsible closed" style="max-height:0;">
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <p class="text-xs font-bold text-amber-700 uppercase tracking-wide mb-3">🏢 Datos de la Inmobiliaria</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="form-label" for="agency-name">Nombre de la Agencia</label>
+                  <input type="text" id="agency-name" class="form-input" placeholder="Inmobiliaria XYZ"/>
+                </div>
+                <div>
+                  <label class="form-label" for="agency-contact">Contacto</label>
+                  <input type="text" id="agency-contact" class="form-input" placeholder="Asesor responsable"/>
+                </div>
+                <div>
+                  <label class="form-label" for="agency-phone">Teléfono Agencia</label>
+                  <input type="text" id="agency-phone" class="form-input" placeholder="3109876543" maxlength="10"/>
+                </div>
+                <div>
+                  <label class="form-label" for="agency-email">Email Agencia</label>
+                  <input type="email" id="agency-email" class="form-input" placeholder="info@inmobiliaria.co"/>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resident Section -->
+          <div id="resident-section" class="collapsible closed" style="max-height:0;">
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p class="text-xs font-bold text-blue-700 uppercase tracking-wide mb-3">👤 Datos del Residente / Arrendatario</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="form-label" for="res-name">Nombre Completo</label>
+                  <input type="text" id="res-name" class="form-input" placeholder="Juan Pérez"/>
+                </div>
+                <div>
+                  <label class="form-label" for="res-doc">Documento</label>
+                  <input type="text" id="res-doc" class="form-input" placeholder="98765432" maxlength="12"/>
+                </div>
+                <div>
+                  <label class="form-label" for="res-phone">Teléfono</label>
+                  <input type="text" id="res-phone" class="form-input" placeholder="3001234567" maxlength="10"/>
+                </div>
+                <div>
+                  <label class="form-label" for="res-email">Correo</label>
+                  <input type="email" id="res-email" class="form-input" placeholder="residente@email.com"/>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECTION 3: Mascotas ── -->
+        <div class="form-section" id="section-mascotas">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-gray-800 flex items-center gap-2">
+              <span class="kpi-icon" style="width:32px;height:32px;border-radius:9px;background:rgba(236,72,153,.12);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+              </span>
+              Mascotas
+            </h3>
+            <label class="toggle-switch" title="Habilitar mascotas">
+              <input type="checkbox" id="pets-toggle" onchange="togglePets()"/>
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            </label>
+          </div>
+          <p id="pets-disabled-msg" class="text-sm text-gray-400 italic">Sin mascotas registradas en este inmueble.</p>
+
+          <!-- Pets container -->
+          <div id="pets-container" class="collapsible closed" style="max-height:0;">
+            <div id="pet-cards-list"></div>
+            <button type="button" class="btn-add-pet mt-2" onclick="addPetCard()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Agregar Mascota
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex justify-end">
+          <button type="submit" id="submit-btn" class="btn-submit">
+            <span id="submit-text">Guardar Registro</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+  </div><!-- end main-content -->
+</div><!-- end dashboard-view -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     SUCCESS MODAL
+═══════════════════════════════════════════════════════════ -->
+<div id="success-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4" style="background:rgba(0,0,0,.5);">
+  <div class="bg-white rounded-2xl p-8 max-w-sm w-full text-center slide-up">
+    <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h3 class="text-xl font-extrabold text-gray-900 mb-2">¡Registro Exitoso!</h3>
+    <p class="text-gray-500 text-sm mb-6">El inmueble y sus residentes han sido registrados correctamente. Se enviará un correo de confirmación.</p>
+    <button onclick="closeSuccessModal()" class="btn-primary">Aceptar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────
+// CONFIG (para Demo / fuera de GAS)
+// En GAS, google.script.run llama al backend
+// ─────────────────────────────────────════════
+const IS_GAS = (typeof google !== 'undefined' && google.script);
+
+// ─── USUARIOS DEMO ──────────────────────────────────────────
+const DEMO_USERS = [
+  { email: 'admin@residapp.co',      password: 'Admin2025!',    name: 'Administrador Principal', role: 'Superadmin' },
+  { email: 'coordinador@residapp.co',password: 'Coord2025#',    name: 'Felipe Morales',          role: 'Coordinador' },
+  { email: 'porteria@residapp.co',   password: 'Porteria123*',  name: 'Jorge Castellanos',       role: 'Portería' },
+  { email: 'gerencia@residapp.co',   password: 'Gerencia2025!', name: 'Sandra Ospina',           role: 'Gerencia' },
+];
+
+// ─── REGISTROS DEMO ─────────────────────────────────────────
+let DEMO_RECORDS = [
+  { timestamp: '2025-01-08 08:30', torre: '1', apartamento: '101', propietario: 'Alejandro Rincón Vargas',    ocupacion: 'Propietario',  mascotas: 0 },
+  { timestamp: '2025-01-15 10:15', torre: '1', apartamento: '302', propietario: 'Valentina Ospina Herrera',   ocupacion: 'Arrendado',    mascotas: 1 },
+  { timestamp: '2025-01-22 14:45', torre: '1', apartamento: '507', propietario: 'Ricardo Bermúdez Leal',      ocupacion: 'Propietario',  mascotas: 2 },
+  { timestamp: '2025-02-03 09:00', torre: '1', apartamento: '804', propietario: 'Marcela Jiménez Parra',      ocupacion: 'Inmobiliaria', mascotas: 0 },
+  { timestamp: '2025-02-14 11:30', torre: '2', apartamento: '201', propietario: 'Sebastián Torres Gómez',     ocupacion: 'Propietario',  mascotas: 1 },
+  { timestamp: '2025-02-20 16:00', torre: '2', apartamento: '406', propietario: 'Natalia Cifuentes Arango',   ocupacion: 'Arrendado',    mascotas: 3 },
+  { timestamp: '2025-03-05 08:50', torre: '2', apartamento: '703', propietario: 'Andrés Montoya Salazar',     ocupacion: 'Propietario',  mascotas: 0 },
+  { timestamp: '2025-03-12 13:20', torre: '2', apartamento: '1108',propietario: 'Carolina Peñaloza Ruiz',     ocupacion: 'Inmobiliaria', mascotas: 1 },
+  { timestamp: '2025-03-18 09:45', torre: '3', apartamento: '105', propietario: 'Julián Acosta Mendoza',      ocupacion: 'Propietario',  mascotas: 2 },
+  { timestamp: '2025-03-25 15:10', torre: '3', apartamento: '402', propietario: 'Isabella Ramírez Castro',    ocupacion: 'Arrendado',    mascotas: 0 },
+  { timestamp: '2025-04-02 10:30', torre: '3', apartamento: '608', propietario: 'Camilo Vargas Escobar',      ocupacion: 'Propietario',  mascotas: 1 },
+  { timestamp: '2025-04-09 14:00', torre: '3', apartamento: '901', propietario: 'Luisa Fernanda Duque',       ocupacion: 'Inmobiliaria', mascotas: 4 },
+  { timestamp: '2025-04-17 11:15', torre: '3', apartamento: '1205',propietario: 'Laura Méndez Villalba',      ocupacion: 'Propietario',  mascotas: 2 },
+  { timestamp: '2025-04-24 09:20', torre: '4', apartamento: '103', propietario: 'Mauricio Ríos Álvarez',      ocupacion: 'Arrendado',    mascotas: 0 },
+  { timestamp: '2025-05-06 16:45', torre: '4', apartamento: '305', propietario: 'Daniela Guerrero Molina',    ocupacion: 'Propietario',  mascotas: 1 },
+  { timestamp: '2025-05-13 08:00', torre: '4', apartamento: '707', propietario: 'Gabriel Suárez Pineda',      ocupacion: 'Inmobiliaria', mascotas: 0 },
+  { timestamp: '2025-05-20 12:30', torre: '4', apartamento: '1004',propietario: 'Sofía Martínez Londoño',     ocupacion: 'Propietario',  mascotas: 2 },
+  { timestamp: '2025-05-27 10:00', torre: '5', apartamento: '202', propietario: 'Diego Hernández Correa',     ocupacion: 'Arrendado',    mascotas: 1 },
+  { timestamp: '2025-06-03 14:20', torre: '5', apartamento: '504', propietario: 'Paola Cardona Betancur',     ocupacion: 'Propietario',  mascotas: 0 },
+  { timestamp: '2025-06-10 09:55', torre: '5', apartamento: '806', propietario: 'Esteban Velásquez Toro',     ocupacion: 'Inmobiliaria', mascotas: 3 },
+  { timestamp: '2025-06-15 11:40', torre: '5', apartamento: '1101',propietario: 'Manuela Agudelo Sierra',     ocupacion: 'Propietario',  mascotas: 1 },
+  { timestamp: '2025-06-18 15:00', torre: '1', apartamento: '1007',propietario: 'Pablo Gutiérrez Restrepo',   ocupacion: 'Arrendado',    mascotas: 2 },
+  { timestamp: '2025-06-20 08:30', torre: '2', apartamento: '908', propietario: 'Ana Milena Patiño Cruz',     ocupacion: 'Propietario',  mascotas: 0 },
+  { timestamp: '2025-06-22 13:10', torre: '3', apartamento: '1308',propietario: 'Carlos Eduardo Mora',        ocupacion: 'Propietario',  mascotas: 1 },
+  { timestamp: '2025-06-24 16:30', torre: '4', apartamento: '501', propietario: 'María Paula Estrada',        ocupacion: 'Arrendado',    mascotas: 2 },
+];
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let petCount = 0;
+let currentUser = null;
+
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+function $(id){ return document.getElementById(id); }
+
+function showToast(msg, type='info', duration=4000){
+  const c = $('toast-container');
+  const t = document.createElement('div');
+  const icons = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>',
+    error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  };
+  t.className = `toast ${type}`;
+  t.innerHTML = `${icons[type]||icons.info} <span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(40px)'; t.style.transition='all .3s'; setTimeout(()=>t.remove(),300); }, duration);
+}
+
+function setBtn(btnId, state){
+  const btn = $(btnId);
+  if(!btn) return;
+  if(state === 'loading'){
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Procesando…';
+  } else if(state === 'done'){
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> ¡Listo!';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.original || btn.innerHTML;
+  }
+}
+
+function sanitize(str){ return String(str).replace(/[<>"'&]/g,'').trim(); }
+
+// ─────────────────────────────────────────────
+// DATE
+// ─────────────────────────────────────────────
+function setDate(){
+  const now = new Date();
+  const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+  const el = $('topbar-date');
+  if(el) el.textContent = now.toLocaleDateString('es-CO', opts);
+}
+
+// ─────────────────────────────────────────────
+// VIEWS / ROUTING
+// ─────────────────────────────────────────────
+function showView(viewId){
+  document.querySelectorAll('.view').forEach(v => { v.classList.remove('active'); });
+  const v = $(viewId);
+  if(v){ v.classList.add('active'); }
+}
+
+function showPanel(name){
+  $('panel-home').classList.toggle('hidden', name !== 'home');
+  $('panel-form').classList.toggle('hidden', name !== 'form');
+  $('nav-home').classList.toggle('active', name === 'home');
+  $('nav-form').classList.toggle('active', name === 'form');
+  $('topbar-title').textContent = name === 'home' ? 'Dashboard' : 'Nuevo Registro';
+  // update steps
+  updateSteps();
+  if(window.innerWidth < 768) toggleSidebar(false);
+}
+
+// ─────────────────────────────────────────────
+// SIDEBAR (mobile)
+// ─────────────────────────────────────────────
+function toggleSidebar(open){
+  const sb = $('sidebar');
+  const ov = $('sidebar-overlay');
+  if(open){ sb.classList.add('open'); ov.classList.add('visible'); }
+  else    { sb.classList.remove('open'); ov.classList.remove('visible'); }
+}
+
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+function initAuth(){
+  const session = localStorage.getItem('residapp_session');
+  if(session){
+    try{
+      currentUser = JSON.parse(session);
+      enterDashboard(currentUser);
+    } catch(e){ localStorage.removeItem('residapp_session'); }
+  }
+}
+
+function enterDashboard(user){
+  currentUser = user;
+  const initials = (user.name||user.email||'A').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  $('sidebar-avatar').textContent = initials;
+  $('topbar-avatar').textContent = initials;
+  $('sidebar-user-name').textContent = user.name || 'Administrador';
+  $('sidebar-user-email').textContent = user.role ? `${user.role} · ${user.email}` : (user.email || '');
+  showView('dashboard-view');
+  setDate();
+  loadDashboard();
+  // Show role badge in topbar
+  const roleColors = { 'Superadmin':'bg-purple-100 text-purple-700', 'Coordinador':'bg-blue-100 text-blue-700', 'Portería':'bg-amber-100 text-amber-700', 'Gerencia':'bg-emerald-100 text-emerald-700' };
+  const roleClass = roleColors[user.role] || 'bg-gray-100 text-gray-600';
+  if(user.role && $('topbar-role-badge')){
+    $('topbar-role-badge').textContent = user.role;
+    $('topbar-role-badge').className = `badge ${roleClass} hidden sm:inline-block`;
+  }
+}
+
+function logout(){
+  localStorage.removeItem('residapp_session');
+  currentUser = null;
+  showView('login-view');
+  showToast('Sesión cerrada correctamente.','info');
+}
+
+// ─────────────────────────────────────────────
+// LOGIN FORM
+// ─────────────────────────────────────────────
+$('toggle-pw').addEventListener('click', function(){
+  const pw = $('login-password');
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+});
+
+$('login-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const email = $('login-email').value.trim();
+  const password = $('login-password').value;
+  let valid = true;
+
+  // validate email
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    $('login-email').classList.add('error');
+    $('err-email').classList.add('show');
+    valid = false;
+  } else {
+    $('login-email').classList.remove('error');
+    $('err-email').classList.remove('show');
+  }
+
+  // validate password
+  if(!password){
+    $('login-password').classList.add('error');
+    $('err-password').classList.add('show');
+    valid = false;
+  } else {
+    $('login-password').classList.remove('error');
+    $('err-password').classList.remove('show');
+  }
+
+  if(!valid) return;
+
+  // Store original
+  const btn = $('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Verificando…';
+  $('login-error-msg').classList.add('hidden');
+
+  if(IS_GAS){
+    google.script.run
+      .withSuccessHandler(function(res){
+        btn.disabled = false;
+        btn.innerHTML = 'Iniciar Sesión';
+        if(res.success){
+          localStorage.setItem('residapp_session', JSON.stringify(res.user));
+          enterDashboard(res.user);
+        } else {
+          showLoginError();
+        }
+      })
+      .withFailureHandler(function(){
+        btn.disabled = false;
+        btn.innerHTML = 'Iniciar Sesión';
+        showToast('Error de conexión con el servidor.','error');
+      })
+      .verifyLogin(email, password);
+  } else {
+    // DEMO mode
+    setTimeout(function(){
+      btn.disabled = false;
+      btn.innerHTML = 'Iniciar Sesión';
+      const found = DEMO_USERS.find(u => u.email === email && u.password === password);
+      if(found){
+        const user = { email: found.email, name: found.name, role: found.role };
+        localStorage.setItem('residapp_session', JSON.stringify(user));
+        enterDashboard(user);
+        showToast(`¡Bienvenido/a, ${found.name}!`, 'success');
+      } else {
+        showLoginError();
+      }
+    }, 1000);
+  }
+});
+
+function showLoginError(){
+  $('login-error-msg').classList.remove('hidden');
+  $('login-email').classList.add('error');
+  $('login-password').classList.add('error');
+  showToast('Credenciales incorrectas.','error');
+}
+
+// ─────────────────────────────────────────────
+// DASHBOARD DATA
+// ─────────────────────────────────────────────
+function loadDashboard(){
+  $('table-loading').classList.remove('hidden');
+  $('table-wrapper').classList.add('hidden');
+  $('table-empty').classList.add('hidden');
+  $('kpi-apts').textContent = '—';
+  $('kpi-pets').textContent = '—';
+  $('kpi-recent').textContent = '—';
+
+  if(IS_GAS){
+    google.script.run
+      .withSuccessHandler(renderDashboard)
+      .withFailureHandler(function(e){
+        showToast('Error al cargar dashboard: ' + e.message,'error');
+        $('table-loading').classList.add('hidden');
+        $('table-empty').classList.remove('hidden');
+      })
+      .getDashboardData();
+  } else {
+    setTimeout(function(){
+      const now = new Date();
+      const ms30 = 30 * 24 * 60 * 60 * 1000;
+      const recent30 = DEMO_RECORDS.filter(function(r){
+        return (now - new Date(r.timestamp.replace(' ','T'))) < ms30;
+      }).length;
+      renderDashboard({
+        kpis: {
+          totalApts: DEMO_RECORDS.length,
+          totalPets: DEMO_RECORDS.reduce(function(a,r){ return a + r.mascotas; }, 0),
+          recent30: recent30
+        },
+        records: [...DEMO_RECORDS].reverse()
+      });
+    }, 700);
+  }
+}
+
+function renderDashboard(data){
+  $('kpi-apts').textContent   = data.kpis.totalApts ?? '0';
+  $('kpi-pets').textContent   = data.kpis.totalPets ?? '0';
+  $('kpi-recent').textContent = data.kpis.recent30 ?? '0';
+
+  // Extra KPIs
+  const withPets = (data.records||[]).filter(r=>r.mascotas>0).length;
+  const pct = data.kpis.totalApts > 0 ? Math.round(withPets/data.kpis.totalApts*100) : 0;
+  $('kpi-with-pets').textContent   = withPets;
+  $('kpi-with-pets-pct').textContent = `${pct}% del total`;
+
+  // Ocupación bars
+  const ocupCount = { Propietario: 0, Arrendado: 0, Inmobiliaria: 0 };
+  const torresCount = { '1':0,'2':0,'3':0,'4':0,'5':0 };
+  (data.records||[]).forEach(function(r){
+    if(ocupCount[r.ocupacion] !== undefined) ocupCount[r.ocupacion]++;
+    if(torresCount[r.torre] !== undefined) torresCount[r.torre]++;
+  });
+  const total = data.kpis.totalApts || 1;
+  const ocupStyles = {
+    Propietario:  { bar:'bg-emerald-400', label:'text-emerald-700', bg:'bg-emerald-50' },
+    Arrendado:    { bar:'bg-blue-400',    label:'text-blue-700',    bg:'bg-blue-50' },
+    Inmobiliaria: { bar:'bg-amber-400',   label:'text-amber-700',   bg:'bg-amber-50' },
+  };
+  const ocupEl = $('ocupacion-bars');
+  if(ocupEl){
+    ocupEl.innerHTML = Object.entries(ocupCount).map(function([k,v]){
+      const pct = Math.round(v/total*100);
+      const s = ocupStyles[k];
+      return `
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="text-xs font-semibold ${s.label}">${k}</span>
+            <span class="text-xs text-gray-500">${v} apt · ${pct}%</span>
+          </div>
+          <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div class="h-2 rounded-full ${s.bar} transition-all duration-700" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Torres bar chart
+  const torresEl = $('torres-bars');
+  if(torresEl){
+    const maxT = Math.max(...Object.values(torresCount), 1);
+    const tColors = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ec4899'];
+    torresEl.innerHTML = Object.entries(torresCount).map(function([t,v],i){
+      const h = Math.max(Math.round(v/maxT*100), 4);
+      return `
+        <div class="flex flex-col items-center justify-end h-full gap-1">
+          <span class="text-xs font-bold text-gray-700">${v}</span>
+          <div class="w-full rounded-t-lg transition-all duration-700" style="height:${h}%;background:${tColors[i]};opacity:.85;min-height:4px;"></div>
+        </div>`;
+    }).join('');
+  }
+
+  const tbody = $('records-tbody');
+  tbody.innerHTML = '';
+  $('table-loading').classList.add('hidden');
+
+  if(!data.records || data.records.length === 0){
+    $('table-empty').classList.remove('hidden');
+    return;
+  }
+
+  $('table-wrapper').classList.remove('hidden');
+  const ocupBadge = {
+    'Propietario': 'bg-emerald-100 text-emerald-700',
+    'Arrendado':   'bg-blue-100 text-blue-700',
+    'Inmobiliaria':'bg-amber-100 text-amber-700'
+  };
+
+  data.records.slice(0,10).forEach(function(r){
+    const tr = document.createElement('tr');
+    const badge = ocupBadge[r.ocupacion] || 'bg-gray-100 text-gray-600';
+    tr.innerHTML = `
+      <td><span class="font-semibold text-emerald-700">T${r.torre}</span> — <span class="font-mono text-gray-700">${r.apartamento}</span></td>
+      <td class="font-medium text-gray-800">${sanitize(r.propietario)}</td>
+      <td><span class="badge ${badge}">${r.ocupacion}</span></td>
+      <td class="text-center">${r.mascotas > 0
+        ? `<span class="badge bg-pink-100 text-pink-700">${r.mascotas} 🐾</span>`
+        : '<span class="text-gray-300 text-sm">—</span>'}</td>
+      <td class="text-gray-400 text-xs whitespace-nowrap">${r.timestamp}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ─────────────────────────────────────────────
+// OCUPACIÓN LOGIC
+// ─────────────────────────────────────────────
+function handleOcupacion(){
+  const val = $('ocupacion').value;
+  const agencyEl = $('agency-section');
+  const residentEl = $('resident-section');
+
+  const showAgency   = val === 'Inmobiliaria';
+  const showResident = val === 'Arrendado' || val === 'Inmobiliaria';
+
+  toggleCollapsible(agencyEl,   showAgency,   '400px');
+  toggleCollapsible(residentEl, showResident, '400px');
+}
+
+function toggleCollapsible(el, show, maxH){
+  if(show){ el.classList.remove('closed'); el.classList.add('open'); el.style.maxHeight = maxH; }
+  else    { el.classList.add('closed'); el.classList.remove('open'); el.style.maxHeight = '0'; }
+}
+
+// ─────────────────────────────────────────────
+// PETS
+// ─────────────────────────────────────────────
+function togglePets(){
+  const checked = $('pets-toggle').checked;
+  const container = $('pets-container');
+  $('pets-disabled-msg').style.display = checked ? 'none' : 'block';
+  toggleCollapsible(container, checked, '5000px');
+  if(checked && petCount === 0) addPetCard();
+}
+
+function addPetCard(){
+  const idx = petCount++;
+  const list = $('pet-cards-list');
+  const card = document.createElement('div');
+  card.className = 'pet-card slide-up';
+  card.id = `pet-card-${idx}`;
+  card.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-semibold text-gray-700 text-sm flex items-center gap-1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
+        Mascota #${idx+1}
+      </p>
+      <button type="button" class="btn-remove-pet" onclick="removePetCard(${idx})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Eliminar
+      </button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+      <div>
+        <label class="form-label">Nombre *</label>
+        <input type="text" class="form-input pet-name" placeholder="Firulais" data-pet="${idx}"/>
+      </div>
+      <div>
+        <label class="form-label">Raza</label>
+        <input type="text" class="form-input pet-breed" placeholder="Labrador" data-pet="${idx}"/>
+      </div>
+      <div>
+        <label class="form-label">Tipo *</label>
+        <select class="form-select pet-type" data-pet="${idx}">
+          <option value="">Seleccionar…</option>
+          <option value="Perro">🐕 Perro</option>
+          <option value="Gato">🐈 Gato</option>
+          <option value="Otro">🐾 Otro</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="form-label">Foto de la Mascota <span class="text-gray-400 font-normal">(JPG/PNG, máx. 5MB)</span></label>
+      <div class="drop-zone" id="drop-${idx}" ondragover="handleDragOver(event,${idx})" ondragleave="handleDragLeave(event,${idx})" ondrop="handleDrop(event,${idx})" onclick="triggerFileInput(${idx})">
+        <input type="file" id="file-input-${idx}" accept="image/jpeg,image/png" class="hidden" onchange="handleFileSelect(event,${idx})"/>
+        <div id="drop-placeholder-${idx}">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" class="mx-auto mb-2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <p class="text-sm text-gray-400">Arrastra la foto aquí o <span class="text-emerald-600 font-semibold">haz clic</span></p>
+          <p class="text-xs text-gray-300 mt-1">JPG, PNG — máx. 5 MB</p>
+        </div>
+        <img id="preview-img-${idx}" class="preview-img hidden" alt="Preview mascota"/>
+        <p id="preview-name-${idx}" class="text-xs text-emerald-600 font-medium mt-1 hidden"></p>
+      </div>
+    </div>
+  `;
+  list.appendChild(card);
+}
+
+function removePetCard(idx){
+  const c = $(`pet-card-${idx}`);
+  if(c){ c.style.opacity='0'; c.style.transform='scale(.95)'; c.style.transition='all .2s'; setTimeout(()=>c.remove(),200); }
+  // Renumber labels
+  setTimeout(function(){
+    document.querySelectorAll('.pet-card').forEach(function(card,i){
+      const label = card.querySelector('p.font-semibold');
+      if(label) label.innerHTML = label.innerHTML.replace(/Mascota #\d+/,`Mascota #${i+1}`);
+    });
+  },250);
+}
+
+// ── Drag & Drop ──
+function triggerFileInput(idx){ $(`file-input-${idx}`).click(); }
+
+function handleDragOver(e,idx){
+  e.preventDefault(); $(`drop-${idx}`).classList.add('dragover');
+}
+function handleDragLeave(e,idx){
+  $(`drop-${idx}`).classList.remove('dragover');
+}
+function handleDrop(e,idx){
+  e.preventDefault(); $(`drop-${idx}`).classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if(f) processImage(f,idx);
+}
+function handleFileSelect(e,idx){
+  const f = e.target.files[0];
+  if(f) processImage(f,idx);
+}
+
+function processImage(file,idx){
+  if(!['image/jpeg','image/png'].includes(file.type)){
+    showToast('Solo se permiten imágenes JPG o PNG.','error'); return;
+  }
+  if(file.size > 5 * 1024 * 1024){
+    showToast('La imagen no puede superar los 5 MB.','error'); return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const preview = $(`preview-img-${idx}`);
+    const placeholder = $(`drop-placeholder-${idx}`);
+    const nameEl = $(`preview-name-${idx}`);
+    preview.src = e.target.result;
+    preview.classList.remove('hidden');
+    placeholder.classList.add('hidden');
+    nameEl.textContent = '✓ ' + file.name;
+    nameEl.classList.remove('hidden');
+    // Store base64 on input
+    $(`file-input-${idx}`).dataset.base64 = e.target.result;
+    $(`file-input-${idx}`).dataset.mime = file.type;
+    $(`file-input-${idx}`).dataset.filename = file.name;
+    showToast('Imagen cargada correctamente.','success',2000);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─────────────────────────────────────────────
+// FORM VALIDATION
+// ─────────────────────────────────────────────
+const APTO_REGEX = /^([1-9]|1[0-4])0[1-8]$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function showErr(id, show=true){
+  const el = $(id);
+  if(el) el.classList.toggle('show', show);
+}
+function markInput(id, error=true){
+  const el = $(id);
+  if(el) el.classList.toggle('error', error);
+}
+
+function validateForm(){
+  let valid = true;
+
+  // Torre
+  const torre = $('torre').value;
+  if(!torre){ showErr('err-torre'); markInput('torre'); valid=false; }
+  else { showErr('err-torre',false); markInput('torre',false); }
+
+  // Apartamento
+  const apto = $('apartamento').value.trim();
+  if(!APTO_REGEX.test(apto)){ showErr('err-apto'); markInput('apartamento'); valid=false; }
+  else { showErr('err-apto',false); markInput('apartamento',false); }
+
+  // Propietario nombre
+  const ownerName = $('owner-name').value.trim();
+  if(ownerName.length < 3){ showErr('err-owner-name'); markInput('owner-name'); valid=false; }
+  else { showErr('err-owner-name',false); markInput('owner-name',false); }
+
+  // Documento
+  const doc = $('owner-doc').value.trim();
+  if(!/^\d{6,12}$/.test(doc)){ showErr('err-owner-doc'); markInput('owner-doc'); valid=false; }
+  else { showErr('err-owner-doc',false); markInput('owner-doc',false); }
+
+  // Teléfono
+  const phone = $('owner-phone').value.trim();
+  if(!/^\d{10}$/.test(phone)){ showErr('err-owner-phone'); markInput('owner-phone'); valid=false; }
+  else { showErr('err-owner-phone',false); markInput('owner-phone',false); }
+
+  // Email
+  const email = $('owner-email').value.trim();
+  if(!EMAIL_REGEX.test(email)){ showErr('err-owner-email'); markInput('owner-email'); valid=false; }
+  else { showErr('err-owner-email',false); markInput('owner-email',false); }
+
+  // Ocupación
+  const ocupacion = $('ocupacion').value;
+  if(!ocupacion){ showErr('err-ocupacion'); markInput('ocupacion'); valid=false; }
+  else { showErr('err-ocupacion',false); markInput('ocupacion',false); }
+
+  return valid;
+}
+
+// ─────────────────────────────────────────────
+// COLLECT FORM DATA
+// ─────────────────────────────────────────────
+function collectFormData(){
+  const pets = [];
+  document.querySelectorAll('.pet-card').forEach(function(card){
+    const idx = card.id.replace('pet-card-','');
+    const fileInput = $(`file-input-${idx}`);
+    pets.push({
+      nombre: card.querySelector('.pet-name')?.value?.trim() || '',
+      raza:   card.querySelector('.pet-breed')?.value?.trim() || '',
+      tipo:   card.querySelector('.pet-type')?.value || '',
+      base64: fileInput?.dataset?.base64 || null,
+      mime:   fileInput?.dataset?.mime || null,
+      filename: fileInput?.dataset?.filename || null,
+    });
+  });
+
+  const ocupacion = $('ocupacion').value;
+  return {
+    timestamp: new Date().toISOString(),
+    torre: $('torre').value,
+    apartamento: $('apartamento').value.trim(),
+    propietario: {
+      nombre: sanitize($('owner-name').value),
+      documento: $('owner-doc').value.trim(),
+      telefono: $('owner-phone').value.trim(),
+      email: $('owner-email').value.trim(),
+    },
+    ocupacion: ocupacion,
+    agencia: ocupacion === 'Inmobiliaria' ? {
+      nombre:   sanitize($('agency-name').value),
+      contacto: sanitize($('agency-contact').value),
+      telefono: $('agency-phone').value.trim(),
+      email:    $('agency-email').value.trim(),
+    } : null,
+    residente: (ocupacion === 'Arrendado' || ocupacion === 'Inmobiliaria') ? {
+      nombre:    sanitize($('res-name').value),
+      documento: $('res-doc').value.trim(),
+      telefono:  $('res-phone').value.trim(),
+      email:     $('res-email').value.trim(),
+    } : null,
+    mascotas: pets,
+    tieneMascotas: $('pets-toggle').checked,
+  };
+}
+
+// ─────────────────────────────────────────────
+// REGISTRATION FORM SUBMIT
+// ─────────────────────────────────────────────
+$('registration-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  if(!validateForm()){
+    showToast('Por favor completa todos los campos requeridos.','error');
+    // Scroll to first error
+    const firstErr = document.querySelector('.form-input.error, .form-select.error');
+    if(firstErr) firstErr.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
+  const data = collectFormData();
+  const btn = $('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Guardando registro…';
+
+  if(IS_GAS){
+    google.script.run
+      .withSuccessHandler(function(res){
+        resetSubmitBtn();
+        if(res.success){
+          openSuccessModal();
+          resetForm();
+          DEMO_RECORDS.unshift({ // for local kpi refresh if needed
+            timestamp: new Date().toLocaleString('es-CO'),
+            torre: data.torre, apartamento: data.apartamento,
+            propietario: data.propietario.nombre, ocupacion: data.ocupacion,
+            mascotas: data.mascotas.length
+          });
+        } else {
+          showToast(res.message || 'Error al guardar el registro.','error');
+        }
+      })
+      .withFailureHandler(function(err){
+        resetSubmitBtn();
+        showToast('Error del servidor: ' + err.message, 'error');
+      })
+      .processRegistration(data);
+  } else {
+    // DEMO mode
+    setTimeout(function(){
+      resetSubmitBtn();
+      // Simulate duplicate check
+      const dup = DEMO_RECORDS.find(r => r.torre === data.torre && r.apartamento === data.apartamento);
+      if(dup){
+        showToast(`⚠️ La Torre ${data.torre}, Apto ${data.apartamento} ya está registrado.`,'error',5000);
+        return;
+      }
+      DEMO_RECORDS.unshift({
+        timestamp: new Date().toLocaleString('es-CO'),
+        torre: data.torre, apartamento: data.apartamento,
+        propietario: data.propietario.nombre, ocupacion: data.ocupacion,
+        mascotas: data.mascotas.length
+      });
+      openSuccessModal();
+      resetForm();
+    }, 1800);
+  }
+});
+
+function resetSubmitBtn(){
+  const btn = $('submit-btn');
+  btn.disabled = false;
+  btn.innerHTML = 'Guardar Registro';
+}
+
+function resetForm(){
+  $('registration-form').reset();
+  petCount = 0;
+  $('pet-cards-list').innerHTML = '';
+  $('pets-toggle').checked = false;
+  $('pets-disabled-msg').style.display = 'block';
+  toggleCollapsible($('pets-container'), false, '5000px');
+  toggleCollapsible($('agency-section'), false, '400px');
+  toggleCollapsible($('resident-section'), false, '400px');
+  // Clear errors
+  document.querySelectorAll('.err-msg').forEach(e=>e.classList.remove('show'));
+  document.querySelectorAll('.form-input, .form-select').forEach(e=>e.classList.remove('error'));
+}
+
+// ─────────────────────────────────────────────
+// SUCCESS MODAL
+// ─────────────────────────────────────────────
+function openSuccessModal(){
+  $('success-modal').classList.remove('hidden');
+  $('success-modal').classList.add('flex');
+}
+function closeSuccessModal(){
+  $('success-modal').classList.add('hidden');
+  $('success-modal').classList.remove('flex');
+  showPanel('home');
+  loadDashboard();
+}
+
+// ─────────────────────────────────────────────
+// STEP INDICATOR UPDATE
+// ─────────────────────────────────────────────
+function updateSteps(){
+  // Simple: all steps show as active when on form panel
+  const onForm = !$('panel-form').classList.contains('hidden');
+  ['step1','step2','step3'].forEach((id,i)=>{
+    $(id).className = 'step ' + (onForm ? (i<2?'done':'active') : '');
+  });
+  ['line1','line2'].forEach((id,i)=>{
+    $(id).className = 'step-line ' + (onForm && i<1 ? 'done' : '');
+  });
+}
+
+// ─────────────────────────────────────────────
+// INPUT MASKS
+// ─────────────────────────────────────────────
+$('owner-doc').addEventListener('input', function(){
+  this.value = this.value.replace(/\D/g,'');
+});
+$('owner-phone').addEventListener('input', function(){
+  this.value = this.value.replace(/\D/g,'');
+});
+$('agency-phone').addEventListener('input', function(){
+  this.value = this.value.replace(/\D/g,'');
+});
+$('res-doc').addEventListener('input', function(){
+  this.value = this.value.replace(/\D/g,'');
+});
+$('res-phone').addEventListener('input', function(){
+  this.value = this.value.replace(/\D/g,'');
+});
+$('apartamento').addEventListener('input', function(){
+  this.value = this.value.replace(/\D/g,'');
+});
+
+// ─────────────────────────────────────────────
+// CREDENTIALS PANEL
+// ─────────────────────────────────────────────
+function buildCredentialsPanel(){
+  const list = $('creds-list');
+  if(!list) return;
+  const roleColors = {
+    'Superadmin': { bg: 'rgba(168,85,247,.18)', text: '#d8b4fe', border: 'rgba(168,85,247,.3)' },
+    'Coordinador':{ bg: 'rgba(59,130,246,.18)', text: '#93c5fd', border: 'rgba(59,130,246,.3)' },
+    'Portería':   { bg: 'rgba(245,158,11,.18)', text: '#fcd34d', border: 'rgba(245,158,11,.3)' },
+    'Gerencia':   { bg: 'rgba(16,185,129,.18)', text: '#6ee7b7', border: 'rgba(16,185,129,.3)' },
+  };
+  list.innerHTML = DEMO_USERS.map(function(u){
+    const c = roleColors[u.role] || { bg:'rgba(255,255,255,.08)', text:'#fff', border:'rgba(255,255,255,.15)' };
+    return `
+    <button type="button" onclick="autofillLogin('${u.email}','${u.password}')"
+      class="w-full text-left px-4 py-3 transition-all hover:bg-white/10 flex items-center gap-3 group">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+           style="background:${c.bg};color:${c.text};border:1px solid ${c.border};">
+        ${u.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-white text-xs font-semibold truncate">${u.name}</p>
+        <p class="text-xs truncate" style="color:rgba(255,255,255,.45);">${u.email}</p>
+      </div>
+      <div class="flex flex-col items-end gap-1">
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${c.bg};color:${c.text};border:1px solid ${c.border};">${u.role}</span>
+        <span class="text-xs font-mono" style="color:rgba(255,255,255,.35);">${u.password}</span>
+      </div>
+    </button>`;
+  }).join('');
+}
+
+function toggleCredentials(){
+  const panel = $('credentials-panel');
+  const btn   = $('toggle-creds-btn');
+  const open  = panel.classList.toggle('hidden');
+  btn.textContent = open ? 'Mostrar' : 'Ocultar';
+  if(!open) buildCredentialsPanel();
+}
+
+function autofillLogin(email, password){
+  $('login-email').value    = email;
+  $('login-password').value = password;
+  $('login-email').classList.remove('error');
+  $('login-password').classList.remove('error');
+  $('err-email').classList.remove('show');
+  $('err-password').classList.remove('show');
+  $('login-error-msg').classList.add('hidden');
+  showToast('Credenciales cargadas. Haz clic en Iniciar Sesión.', 'info', 3000);
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function(){
+  initAuth();
+  updateSteps();
+  buildCredentialsPanel();
+});
+</script>
